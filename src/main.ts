@@ -649,7 +649,14 @@ async function downloadPdfImages(data: { pages: Uint8Array[]; paper: 'letter' | 
     };
     assertCurrent();
     const images = data.pages.map(page => page instanceof Uint8Array ? page : new Uint8Array(page));
-    const bytes = await createSheetPdf(images, data.paper, { assertCurrent, landscape: data.landscape, pageSize: data.pageSize });
+    sendMessage({ type: 'pdf-progress', requestId: operation.id, data: null });
+    const bytes = await createSheetPdf(images, data.paper, { assertCurrent, landscape: data.landscape, pageSize: data.pageSize,
+      onProgress: (current, total) => {
+        assertCurrent();
+        setPdfStatus(`Building PDF page ${current} of ${total}…`);
+        sendMessage({ type: 'pdf-progress', requestId: operation.id, data: null });
+      },
+    });
     assertCurrent();
     if (bytes.byteLength > 256 * 1024 * 1024) throw new Error('The PDF exceeds the 256 MiB download limit.');
     await new Promise<void>((resolve, reject) => {

@@ -30,7 +30,11 @@ export function calculateFrontLayout(mode: FaceMode, width: number, height: numb
   }
   if (!Number.isSafeInteger(count) || count <= 0) throw new Error('Add at least one card before forging.');
   if (mode.endsWith('-single')) {
-    return { width: count * width + (count - 1) * CARD_GAP, height, columns: count, rows: 1, perPage: count, pageCount: 1, startX: 0, startY: 0, margin: 0, gap: CARD_GAP };
+    const columns = Math.min(13, count);
+    const rows = Math.ceil(count / columns);
+    return { width: columns * width + (columns - 1) * CARD_GAP,
+      height: rows * height + (rows - 1) * CARD_GAP,
+      columns, rows, perPage: count, pageCount: 1, startX: 0, startY: 0, margin: 0, gap: CARD_GAP };
   }
   let pageWidth = (paper === 'a4' ? 210 : 215.9) * CANVAS_UNITS_PER_MM;
   let pageHeight = (paper === 'a4' ? 297 : 279.4) * CANVAS_UNITS_PER_MM;

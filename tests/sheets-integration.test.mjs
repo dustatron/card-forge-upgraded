@@ -366,3 +366,40 @@ test('a collaborator timestamp-only refresh permits an identical PDF download', 
   const source = sources.readSource(f.page); source.lastApplied = '2026-10-05T14:00:00.000Z'; f.page.setPluginData('deck-source', JSON.stringify(source));
   f.message('pdf-check', null, { requestId: 'pdf-1' }); assert.equal(f.messages.at(-1).type, 'PDF_CHECKED');
 });
+
+function timedPdfFixture() {
+  let now = 0; const timers = [];
+  const f = fixture(undefined, { Date: { now: () => now }, setTimeout: (callback, delay) => { timers.push({callback, delay}); } });
+  const data = Array.from({length:3}, (_,index)=>({'#name':String(index)}));
+  f.forge('fronts-single',data);
+  return { f, data, timers, time(value) { now=value; }, start() { f.message('export-front-pdf',{type:'fronts-single',cardsData:data,paper:'a4',cutMarks:false},{requestId:'timed-pdf'}); } };
+}
+
+test('PDF rendering can exceed two minutes while pages keep completing',async()=>{
+  const t=timedPdfFixture();let now=0;
+  t.f.output().children.forEach(page=>{page.export=async()=>{t.time(now+=60_000);return new Uint8Array([1]);};});
+  t.start();await tick();
+  assert.equal(t.f.messages.at(-1).type,'FRONT_PDF_IMAGES');
+  t.f.message('pdf-check',null,{requestId:'timed-pdf'});
+  assert.equal(t.f.messages.at(-1).type,'PDF_CHECKED');
+});
+
+test('assembly progress renews PDF timeout; a stalled operation still expires',async()=>{
+  const t=timedPdfFixture();t.start();await tick();
+  t.time(90_000);t.f.message('pdf-progress',null,{requestId:'timed-pdf'});
+  t.time(120_001);t.timers.shift().callback();
+  assert.ok(t.timers.length>0);
+  t.time(180_000);t.f.message('pdf-progress',null,{requestId:'timed-pdf'});
+  t.time(240_000);t.f.message('pdf-check',null,{requestId:'timed-pdf'});
+  assert.equal(t.f.messages.at(-1).type,'PDF_CHECKED');
+  t.time(300_001);t.f.message('pdf-check',null,{requestId:'timed-pdf'});
+  assert.ok(t.f.messages.some(message=>message.type==='PDF_EXPORT_ERROR' && /timed out/.test(message.data)));
+});
+
+test('progress from an unrelated PDF cannot keep a stalled operation alive',async()=>{
+  const t=timedPdfFixture();t.start();await tick();
+  t.time(90_000);t.f.message('pdf-progress',null,{requestId:'another-pdf'});
+  t.time(120_001);t.timers.shift().callback();
+  assert.equal(t.f.messages.at(-1).type,'PDF_EXPORT_ERROR');
+  assert.match(t.f.messages.at(-1).data,/timed out/);
+});

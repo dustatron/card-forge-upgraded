@@ -405,6 +405,8 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
     if (message.type === 'sheet-status') { sourceStatus();
     } else if (message.type === 'pdf-finish') {
         if (pdfOperation?.id === message.requestId && deckSession.matches(message)) pdfOperation = null;
+    } else if (message.type === 'pdf-progress') {
+        if (pdfLocked() && pdfOperation && pdfOperation.id === message.requestId && deckSession.matches(message)) pdfOperation.deadline = Date.now() + 120_000;
     } else if (message.type === 'pdf-check') {
         const operation = pdfOperation;
         if (pdfLocked() && operation && operation.id === message.requestId && deckSession.matches(operation.context) && operation.fingerprint === pdfFingerprint()) {
@@ -546,10 +548,18 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
         const operation = { id: requestId ?? `pdf-${++pdfSerial}`, context, fingerprint: pdfFingerprint(), deadline: Date.now() + 120_000 };
         pdfOperation = operation;
         // Bounded cleanup in real controllers; fixtures without timers still check the deadline on every action.
-        if (typeof setTimeout === 'function') setTimeout(() => {
-            if (pdfOperation === operation) { pdfOperation = null; sendUi({ type: 'PDF_EXPORT_ERROR', data: 'PDF export timed out. Download again.', requestId: operation.id }, context); }
-        }, 120_000);
-        exportFrontSheets(penpot, message.data, () => pdfOperation === operation && deckSession.matches(context) && Date.now() <= operation.deadline, data => sendUi({ type: 'PDF_EXPORT_PROGRESS', data, requestId }, context))
+        const checkIdle = () => {
+            if (pdfOperation !== operation) return;
+            const remaining = operation.deadline - Date.now();
+            if (remaining <= 0) pdfLocked();
+            else if (typeof setTimeout === 'function') setTimeout(checkIdle, remaining + 1);
+        };
+        if (typeof setTimeout === 'function') setTimeout(checkIdle, 120_001);
+        exportFrontSheets(penpot, message.data, () => pdfOperation === operation && deckSession.matches(context) && Date.now() <= operation.deadline, data => {
+            if (pdfOperation !== operation) return;
+            operation.deadline = Date.now() + 120_000;
+            sendUi({ type: 'PDF_EXPORT_PROGRESS', data, requestId }, context);
+        })
             .then(data => {
                 if (pdfOperation !== operation || !deckSession.matches(context)) throw new Error('The deck changed during export. Forge again before downloading.');
                 sendUi({ type: 'FRONT_PDF_IMAGES', data, requestId }, context);

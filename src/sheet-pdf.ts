@@ -3,7 +3,7 @@ import type { PaperSize } from './output-options';
 
 const MAX_INPUT_BYTES = 256 * 1024 * 1024;
 const MAX_EMBEDDED_BYTES = 128 * 1024 * 1024;
-interface PdfOptions { assertCurrent?: () => void; landscape?: boolean; pageSize?: [number, number] }
+interface PdfOptions { assertCurrent?: () => void; landscape?: boolean; pageSize?: [number, number]; onProgress?: (current: number, total: number) => void }
 
 export async function createSheetPdf(images: readonly Uint8Array[], paper: PaperSize, options: PdfOptions = {}): Promise<Uint8Array> {
   if (images.length === 0) throw new Error('There are no sheets to download.');
@@ -36,6 +36,7 @@ export async function createSheetPdf(images: readonly Uint8Array[], paper: Paper
       // embedPng defers compression by default. Materialize each image now so
       // pdf-lib releases its decoded channels before the next sheet is loaded.
       await image.embed();
+      options.onProgress?.(index + 1, images.length);
       const retained = pdf.context.enumerateIndirectObjects().reduce((sum, [, object]) => sum + (object instanceof PDFRawStream ? object.getContentsSize() : 0), 0);
       if (retained > MAX_EMBEDDED_BYTES) throw new Error('The PDF is too large. Export fewer cards at a time.');
       // Let page changes and edits arrive between CPU-heavy PNG operations.

@@ -448,3 +448,25 @@ test('Print and Play export stops if the shared Back changes during rendering', 
   assert.equal(f.messages.at(-1).type,'PDF_EXPORT_ERROR');
   assert.match(f.messages.at(-1).data,/changed/);
 });
+
+for (const count of [1, 12, 13, 14, 26, 52]) {
+  test(`single fronts: ${count} cards wrap after 13 columns without resizing or reordering`, () => {
+    const f = fixture();
+    f.forge('fronts-single', deck(count));
+    const output = f.output();
+    const cards = output.children;
+    assert.equal(cards.length, count);
+    assert.deepEqual(cards.map(card => walk(card).find(shape => shape.type === 'text').characters), deck(count).map(card => card['#name']));
+    for (const [index, card] of cards.entries()) {
+      assert.equal(card.width, f.front.width);
+      assert.equal(card.height, f.front.height);
+      assert.ok(card.x >= output.x && card.x + card.width <= output.x + output.width + 1e-7);
+      assert.ok(card.y >= output.y && card.y + card.height <= output.y + output.height + 1e-7);
+      if (index % 13) assert.ok(card.x > cards[index - 1].x);
+      if (index >= 13) {
+        assert.equal(card.x, cards[index - 13].x);
+        assert.ok(card.y > cards[index - 13].y);
+      }
+    }
+  });
+}
