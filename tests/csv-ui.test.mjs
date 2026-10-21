@@ -134,7 +134,7 @@ test('Check again is hidden in valid reviews and for errors requiring spreadshee
 
 test('artwork matching issues expose Check again, then a successful review hides it', () => {
   const f = fixture(); f.ui.openSheet(read, { ...f.context });
-  f.preview({ errors: ['Row 2, art: missing image "healing.png".'], artworkIssues: 1 });
+  f.preview({ errors: ['Row 2, art: couldn\'t find "healing.png" in Artwork on this page. Add the image or check its layer name.'], artworkIssues: 1 });
   assert.equal(f.element('csv-refresh').classList.contains('hidden'), false);
   f.element('csv-refresh').click();
   const request = f.sent.findLast(m => m.type === 'csv-preview');

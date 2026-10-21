@@ -122,7 +122,12 @@ export class CsvImporter {
         const field = fields.find(field => field.name === target);
         if (field?.type === 'image' && value) {
           const matches = matchArtwork(assets, value);
-          if (matches.length !== 1) { artworkIssues++; errors.push(`Row ${row.line}, ${header}: ${matches.length ? 'multiple images named' : 'missing image'} "${value}". Use a unique name or Artwork/path.`); }
+          if (matches.length !== 1) {
+            artworkIssues++;
+            errors.push(matches.length
+              ? `Row ${row.line}, ${header}: multiple images named "${value}" in Artwork. Use a unique layer name or a full Artwork path.`
+              : `Row ${row.line}, ${header}: couldn't find "${value}" in Artwork on this page. Add the image or check its layer name.`);
+          }
           else { card[target] = matches[0].reference; artworkMatches++; }
         } else card[target] = value;
       }

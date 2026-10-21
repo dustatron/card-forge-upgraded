@@ -786,6 +786,11 @@ function updateTemplateSize() {
 }
 
 function initCards() {
+  document.getElementById('edit-generate-cards-link')?.addEventListener('click', event => {
+    event.preventDefault();
+    changeTab('export');
+    document.getElementById('ts-export')?.focus();
+  });
   loadCardFields(false);
   document.getElementById('refresh-artwork')?.addEventListener('click', () => { setBusy(document.getElementById('refresh-artwork'), true); sendMessage({ type: 'load-artwork', data: null }); });
   document.getElementById('correct-poker-size')?.addEventListener('click', () => {
